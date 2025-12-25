@@ -269,7 +269,7 @@
             padding: 12px 16px;
             border-radius: 16px;
             font-size: 14px;
-            line-height: 1.5;
+            line-height: 1.6;
             word-wrap: break-word;
         }
 
@@ -284,6 +284,58 @@
             color: var(--nc-text-primary);
             border: 1px solid var(--nc-border);
             border-bottom-left-radius: 6px;
+        }
+
+        /* ===== MARKDOWN STYLING IN BOT MESSAGES ===== */
+        .nc-bot .nc-message-content strong {
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .nc-bot .nc-message-content p {
+            margin: 0 0 12px 0;
+        }
+
+        .nc-bot .nc-message-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .nc-bot .nc-message-content ul {
+            margin: 8px 0 12px 0;
+            padding-left: 8px;
+            list-style: none;
+        }
+
+        .nc-bot .nc-message-content li {
+            position: relative;
+            padding-left: 16px;
+            margin-bottom: 6px;
+            color: var(--nc-text-secondary);
+        }
+
+        .nc-bot .nc-message-content li:last-child {
+            margin-bottom: 0;
+        }
+
+        .nc-bot .nc-message-content li::before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: var(--nc-violet);
+            font-weight: bold;
+        }
+
+        .nc-bot .nc-message-content li strong {
+            color: #fff;
+        }
+
+        .nc-bot .nc-message-content a {
+            color: var(--nc-violet);
+            text-decoration: none;
+        }
+
+        .nc-bot .nc-message-content a:hover {
+            text-decoration: underline;
         }
 
         .nc-message-time {
@@ -585,26 +637,83 @@
             return chatId;
         }
 
+        // ===== MARKDOWN PARSER =====
+        function parseMarkdown(text) {
+            if (!text) return '';
+            
+            // Escape HTML to prevent XSS
+            let html = text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+            
+            // Parse **bold**
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            
+            // Parse links [text](url)
+            html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+            
+            // Parse plain URLs (but not ones already in href)
+            html = html.replace(/(?<!href="|">)(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+            
+            // Split into lines for processing
+            const lines = html.split('\n');
+            let result = [];
+            let inList = false;
+            let listItems = [];
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                
+                // Check if line is a bullet point
+                const bulletMatch = line.match(/^[-•*]\s+(.+)$/);
+                
+                if (bulletMatch) {
+                    if (!inList) {
+                        inList = true;
+                        listItems = [];
+                    }
+                    listItems.push('<li>' + bulletMatch[1] + '</li>');
+                } else {
+                    // Close any open list
+                    if (inList) {
+                        result.push('<ul>' + listItems.join('') + '</ul>');
+                        inList = false;
+                        listItems = [];
+                    }
+                    
+                    // Add non-empty lines as paragraphs
+                    if (line) {
+                        result.push('<p>' + line + '</p>');
+                    }
+                }
+            }
+            
+            // Close any remaining open list
+            if (inList) {
+                result.push('<ul>' + listItems.join('') + '</ul>');
+            }
+            
+            return result.join('');
+        }
+
         // ===== CHAT OPEN/CLOSE =====
         function openChat() {
             chatContainer.classList.add('nc-open');
             chatButton.classList.add('nc-hidden');
             chatInput.focus();
-            // Notify parent window that chat is open
             window.parent.postMessage({ type: 'nc-chat-open' }, '*');
         }
 
         function closeChat() {
             chatContainer.classList.remove('nc-open');
             chatButton.classList.remove('nc-hidden');
-            // Notify parent window that chat is closed
             window.parent.postMessage({ type: 'nc-chat-close' }, '*');
         }
 
         chatButton.addEventListener('click', openChat);
         closeBtn.addEventListener('click', closeChat);
 
-        // Close on Escape key
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && chatContainer.classList.contains('nc-open')) {
                 closeChat();
@@ -617,7 +726,6 @@
         }
 
         function addMessage(content, isUser = false) {
-            // Remove welcome message if it's the first user message
             const welcome = messagesContainer.querySelector('.nc-welcome');
             if (welcome && isUser) {
                 welcome.remove();
@@ -626,8 +734,13 @@
             const messageDiv = document.createElement('div');
             messageDiv.className = `nc-message ${isUser ? 'nc-user' : 'nc-bot'}`;
             
+            // Parse markdown for bot messages, escape HTML for user messages
+            const displayContent = isUser 
+                ? content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                : parseMarkdown(content);
+            
             messageDiv.innerHTML = `
-                <div class="nc-message-content">${content}</div>
+                <div class="nc-message-content">${displayContent}</div>
                 <div class="nc-message-time">${formatTime()}</div>
             `;
             
@@ -666,15 +779,12 @@
         async function sendMessage(messageText) {
             if (!messageText.trim()) return;
 
-            // Disable input while processing
             chatInput.disabled = true;
             sendBtn.disabled = true;
 
-            // Add user message
             addMessage(messageText, true);
             chatInput.value = '';
 
-            // Show typing indicator
             const typingIndicator = addTypingIndicator();
 
             try {
@@ -690,20 +800,17 @@
 
                 const data = await response.json();
                 
-                // Remove typing indicator
                 removeTypingIndicator(typingIndicator);
                 
-                // Add bot response
                 const botResponse = data.output || "Thanks for reaching out! Our team will get back to you soon.";
                 addMessage(botResponse, false);
 
             } catch (error) {
                 console.error('Chat error:', error);
                 removeTypingIndicator(typingIndicator);
-                addMessage("Sorry, I'm having trouble connecting right now. Please try again or <a href='https://nutricove.co/contact' style='color: var(--nc-violet);'>book a call</a> directly.", false);
+                addMessage("Sorry, I'm having trouble connecting right now. Please try again or visit our [contact page](https://nutricove.co/contact) directly.", false);
             }
 
-            // Re-enable input
             chatInput.disabled = false;
             sendBtn.disabled = false;
             chatInput.focus();
@@ -719,7 +826,6 @@
             }
         });
 
-        // Quick action buttons
         quickBtns.forEach(btn => {
             btn.addEventListener('click', () => {
                 const message = btn.getAttribute('data-message');
