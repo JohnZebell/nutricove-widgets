@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NutriCove Chat Widget</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --nc-violet: #854fff;
+            --nc-violet-dark: #6b3fd4;
+            --nc-violet-glow: rgba(133, 79, 255, 0.4);
+            --nc-bg-primary: #0a0a0f;
+            --nc-bg-secondary: #12121a;
+            --nc-bg-tertiary: #1a1a24;
+            --nc-text-primary: #ffffff;
+            --nc-text-secondary: rgba(255, 255, 255, 0.7);
+            --nc-text-muted: rgba(255, 255, 255, 0.4);
+            --nc-border: rgba(255, 255, 255, 0.08);
+            --nc-user-bubble: #854fff;
+            --nc-bot-bubble: #1e1e2a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            background: transparent !important;
+            overflow: visible;
+            pointer-events: none;
+        }
+
+        #nc-chat-button,
+        #nc-chat-container {
+            pointer-events: auto;
+        }
+
+        /* ===== CHAT WIDGET BUTTON ===== */
+        #nc-chat-button {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--nc-violet) 0%, var(--nc-violet-dark) 100%);
+            border: none;
+            cursor: pointer;
+            z-index: 2147483647;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 
+                0 4px 20px var(--nc-violet-glow),
+                0 0 0 0 var(--nc-violet-glow);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            animation: nc-pulse 3s ease-in-out infinite;
+        }
+
+        @keyframes nc-pulse {
+            0%, 100% { box-shadow: 0 4px 20px var(--nc-violet-glow), 0 0 0 0 var(--nc-violet-glow); }
+            50% { box-shadow: 0 4px 30px var(--nc-violet-glow), 0 0 0 8px rgba(133, 79, 255, 0); }
+        }
+
+        #nc-chat-button:hover {
+            transform: scale(1.08);
+            box-shadow: 0 6px 30px var(--nc-violet-glow);
+        }
+
+        #nc-chat-button:active {
+            transform: scale(0.95);
+        }
+
+        #nc-chat-button svg {
+            width: 26px;
+            height: 26px;
+            fill: white;
+            transition: transform 0.3s ease;
+        }
+
+        #nc-chat-button:hover svg {
+            transform: scale(1.1);
+        }
+
+        #nc-chat-button.nc-hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(0.8);
+        }
+
+        /* ===== CHAT CONTAINER ===== */
+        #nc-chat-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 380px;
+            height: 560px;
+            max-height: calc(100vh - 48px);
+            background: var(--nc-bg-secondary);
+            border-radius: 20px;
+            border: 1px solid var(--nc-border);
+            box-shadow: 
+                0 25px 60px rgba(0, 0, 0, 0.5),
+                0 0 80px rgba(133, 79, 255, 0.15);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 2147483647;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(20px) scale(0.95);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        #nc-chat-container.nc-open {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0) scale(1);
+        }
+
+        /* ===== HEADER ===== */
+        #nc-chat-header {
+            padding: 20px 20px 16px;
+            background: linear-gradient(180deg, var(--nc-bg-tertiary) 0%, var(--nc-bg-secondary) 100%);
+            border-bottom: 1px solid var(--nc-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .nc-header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nc-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--nc-violet) 0%, var(--nc-violet-dark) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .nc-header-info h3 {
+            color: var(--nc-text-primary);
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+        }
+
+        .nc-header-info .nc-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 2px;
+        }
+
+        .nc-status-dot {
+            width: 8px;
+            height: 8px;
+            background: #22c55e;
+            border-radius: 50%;
+            animation: nc-status-pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes nc-status-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .nc-status span {
+            font-size: 12px;
+            color: var(--nc-text-muted);
+        }
+
+        #nc-close-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        #nc-close-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        #nc-close-btn svg {
+            width: 18px;
+            height: 18px;
+            stroke: var(--nc-text-secondary);
+            transition: stroke 0.2s ease;
+        }
+
+        #nc-close-btn:hover svg {
+            stroke: var(--nc-text-primary);
+        }
+
+        /* ===== MESSAGES AREA ===== */
+        #nc-chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            scroll-behavior: smooth;
+        }
+
+        #nc-chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #nc-chat-messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #nc-chat-messages::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        #nc-chat-messages::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* ===== MESSAGE BUBBLES ===== */
+        .nc-message {
+            max-width: 85%;
+            animation: nc-message-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes nc-message-in {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .nc-message.nc-user {
+            align-self: flex-end;
+        }
+
+        .nc-message.nc-bot {
+            align-self: flex-start;
+        }
+
+        .nc-message-content {
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 14px;
+            line-height: 1.5;
+            word-wrap: break-word;
+        }
+
+        .nc-user .nc-message-content {
+            background: linear-gradient(135deg, var(--nc-violet) 0%, var(--nc-violet-dark) 100%);
+            color: white;
+            border-bottom-right-radius: 6px;
+        }
+
+        .nc-bot .nc-message-content {
+            background: var(--nc-bot-bubble);
+            color: var(--nc-text-primary);
+            border: 1px solid var(--nc-border);
+            border-bottom-left-radius: 6px;
+        }
+
+        .nc-message-time {
+            font-size: 11px;
+            color: var(--nc-text-muted);
+            margin-top: 4px;
+            padding: 0 4px;
+        }
+
+        .nc-user .nc-message-time {
+            text-align: right;
+        }
+
+        /* ===== TYPING INDICATOR ===== */
+        .nc-typing {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 16px;
+            background: var(--nc-bot-bubble);
+            border-radius: 16px;
+            border: 1px solid var(--nc-border);
+            border-bottom-left-radius: 6px;
+            width: fit-content;
+        }
+
+        .nc-typing-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--nc-text-muted);
+            border-radius: 50%;
+            animation: nc-typing-bounce 1.4s infinite ease-in-out;
+        }
+
+        .nc-typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .nc-typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        .nc-typing-dot:nth-child(3) { animation-delay: 0s; }
+
+        @keyframes nc-typing-bounce {
+            0%, 80%, 100% { 
+                transform: scale(1);
+                opacity: 0.4;
+            }
+            40% { 
+                transform: scale(1.2);
+                opacity: 1;
+            }
+        }
+
+        /* ===== INPUT AREA ===== */
+        #nc-chat-input-area {
+            padding: 16px 20px 20px;
+            background: var(--nc-bg-tertiary);
+            border-top: 1px solid var(--nc-border);
+            flex-shrink: 0;
+        }
+
+        .nc-input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--nc-bg-secondary);
+            border: 1px solid var(--nc-border);
+            border-radius: 14px;
+            padding: 4px 4px 4px 16px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .nc-input-wrapper:focus-within {
+            border-color: var(--nc-violet);
+            box-shadow: 0 0 0 3px rgba(133, 79, 255, 0.15);
+        }
+
+        #nc-chat-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--nc-text-primary);
+            font-family: inherit;
+            font-size: 14px;
+            padding: 10px 0;
+        }
+
+        #nc-chat-input::placeholder {
+            color: var(--nc-text-muted);
+        }
+
+        #nc-send-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            border: none;
+            background: linear-gradient(135deg, var(--nc-violet) 0%, var(--nc-violet-dark) 100%);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        #nc-send-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px var(--nc-violet-glow);
+        }
+
+        #nc-send-btn:active {
+            transform: scale(0.95);
+        }
+
+        #nc-send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        #nc-send-btn svg {
+            width: 18px;
+            height: 18px;
+            fill: white;
+        }
+
+        .nc-powered-by {
+            text-align: center;
+            margin-top: 12px;
+            font-size: 11px;
+            color: var(--nc-text-muted);
+        }
+
+        .nc-powered-by a {
+            color: var(--nc-violet);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .nc-powered-by a:hover {
+            text-decoration: underline;
+        }
+
+        /* ===== WELCOME MESSAGE ===== */
+        .nc-welcome {
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        .nc-welcome h4 {
+            color: var(--nc-text-primary);
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .nc-welcome p {
+            color: var(--nc-text-secondary);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        /* ===== QUICK ACTIONS ===== */
+        .nc-quick-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 16px;
+            justify-content: center;
+        }
+
+        .nc-quick-btn {
+            padding: 8px 14px;
+            background: var(--nc-bg-tertiary);
+            border: 1px solid var(--nc-border);
+            border-radius: 20px;
+            color: var(--nc-text-secondary);
+            font-size: 12px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .nc-quick-btn:hover {
+            background: var(--nc-violet);
+            border-color: var(--nc-violet);
+            color: white;
+        }
+
+        /* ===== MOBILE RESPONSIVE ===== */
+        @media (max-width: 480px) {
+            #nc-chat-container {
+                bottom: 0;
+                right: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                max-height: 100%;
+                border-radius: 0;
+            }
+
+            #nc-chat-button {
+                bottom: 16px;
+                right: 16px;
+                width: 56px;
+                height: 56px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Chat Widget Button -->
+    <button id="nc-chat-button" aria-label="Open chat">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z"/>
+        </svg>
+    </button>
+
+    <!-- Chat Container -->
+    <div id="nc-chat-container" role="dialog" aria-label="Chat with NutriCove">
+        <!-- Header -->
+        <header id="nc-chat-header">
+            <div class="nc-header-left">
+                <div class="nc-avatar">🚀</div>
+                <div class="nc-header-info">
+                    <h3>NutriCove</h3>
+                    <div class="nc-status">
+                        <div class="nc-status-dot"></div>
+                        <span>Online now</span>
+                    </div>
+                </div>
+            </div>
+            <button id="nc-close-btn" aria-label="Close chat">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M18 6L6 18M6 6l12 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </header>
+
+        <!-- Messages -->
+        <div id="nc-chat-messages">
+            <div class="nc-welcome">
+                <h4>👋 Hey there!</h4>
+                <p>How can we help you today?<br>Ask us anything about our services.</p>
+                <div class="nc-quick-actions">
+                    <button class="nc-quick-btn" data-message="What services do you offer?">Services</button>
+                    <button class="nc-quick-btn" data-message="How does your process work?">Process</button>
+                    <button class="nc-quick-btn" data-message="I'd like to book a call">Book a call</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div id="nc-chat-input-area">
+            <div class="nc-input-wrapper">
+                <input 
+                    type="text" 
+                    id="nc-chat-input" 
+                    placeholder="Type your message..." 
+                    autocomplete="off"
+                    aria-label="Chat message"
+                >
+                <button id="nc-send-btn" aria-label="Send message">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="nc-powered-by">
+                Powered by <a href="https://nutricove.co" target="_blank">NutriCove</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== CONFIGURATION =====
+        window.NutriCoveChat = {
+            webhook: {
+                url: 'https://n8n.nutricove.co/webhook-test/nutricove-rag',
+                route: 'general'
+            }
+        };
+
+        // ===== DOM ELEMENTS =====
+        const chatButton = document.getElementById('nc-chat-button');
+        const chatContainer = document.getElementById('nc-chat-container');
+        const closeBtn = document.getElementById('nc-close-btn');
+        const messagesContainer = document.getElementById('nc-chat-messages');
+        const chatInput = document.getElementById('nc-chat-input');
+        const sendBtn = document.getElementById('nc-send-btn');
+        const quickBtns = document.querySelectorAll('.nc-quick-btn');
+
+        // ===== SESSION MANAGEMENT =====
+        function getChatId() {
+            let chatId = sessionStorage.getItem('nc-chat-id');
+            if (!chatId) {
+                chatId = 'nc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                sessionStorage.setItem('nc-chat-id', chatId);
+            }
+            return chatId;
+        }
+
+        // ===== CHAT OPEN/CLOSE =====
+        function openChat() {
+            chatContainer.classList.add('nc-open');
+            chatButton.classList.add('nc-hidden');
+            chatInput.focus();
+            // Notify parent window that chat is open
+            window.parent.postMessage({ type: 'nc-chat-open' }, '*');
+        }
+
+        function closeChat() {
+            chatContainer.classList.remove('nc-open');
+            chatButton.classList.remove('nc-hidden');
+            // Notify parent window that chat is closed
+            window.parent.postMessage({ type: 'nc-chat-close' }, '*');
+        }
+
+        chatButton.addEventListener('click', openChat);
+        closeBtn.addEventListener('click', closeChat);
+
+        // Close on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && chatContainer.classList.contains('nc-open')) {
+                closeChat();
+            }
+        });
+
+        // ===== MESSAGE HANDLING =====
+        function formatTime() {
+            return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function addMessage(content, isUser = false) {
+            // Remove welcome message if it's the first user message
+            const welcome = messagesContainer.querySelector('.nc-welcome');
+            if (welcome && isUser) {
+                welcome.remove();
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `nc-message ${isUser ? 'nc-user' : 'nc-bot'}`;
+            
+            messageDiv.innerHTML = `
+                <div class="nc-message-content">${content}</div>
+                <div class="nc-message-time">${formatTime()}</div>
+            `;
+            
+            messagesContainer.appendChild(messageDiv);
+            scrollToBottom();
+            
+            return messageDiv;
+        }
+
+        function addTypingIndicator() {
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'nc-message nc-bot nc-typing-container';
+            typingDiv.innerHTML = `
+                <div class="nc-typing">
+                    <div class="nc-typing-dot"></div>
+                    <div class="nc-typing-dot"></div>
+                    <div class="nc-typing-dot"></div>
+                </div>
+            `;
+            messagesContainer.appendChild(typingDiv);
+            scrollToBottom();
+            return typingDiv;
+        }
+
+        function removeTypingIndicator(element) {
+            if (element && element.parentNode) {
+                element.remove();
+            }
+        }
+
+        function scrollToBottom() {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // ===== SEND MESSAGE =====
+        async function sendMessage(messageText) {
+            if (!messageText.trim()) return;
+
+            // Disable input while processing
+            chatInput.disabled = true;
+            sendBtn.disabled = true;
+
+            // Add user message
+            addMessage(messageText, true);
+            chatInput.value = '';
+
+            // Show typing indicator
+            const typingIndicator = addTypingIndicator();
+
+            try {
+                const response = await fetch(window.NutriCoveChat.webhook.url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chatId: getChatId(),
+                        message: messageText,
+                        route: window.NutriCoveChat.webhook.route
+                    })
+                });
+
+                const data = await response.json();
+                
+                // Remove typing indicator
+                removeTypingIndicator(typingIndicator);
+                
+                // Add bot response
+                const botResponse = data.output || "Thanks for reaching out! Our team will get back to you soon.";
+                addMessage(botResponse, false);
+
+            } catch (error) {
+                console.error('Chat error:', error);
+                removeTypingIndicator(typingIndicator);
+                addMessage("Sorry, I'm having trouble connecting right now. Please try again or <a href='https://nutricove.co/contact' style='color: var(--nc-violet);'>book a call</a> directly.", false);
+            }
+
+            // Re-enable input
+            chatInput.disabled = false;
+            sendBtn.disabled = false;
+            chatInput.focus();
+        }
+
+        // ===== EVENT LISTENERS =====
+        sendBtn.addEventListener('click', () => sendMessage(chatInput.value));
+
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage(chatInput.value);
+            }
+        });
+
+        // Quick action buttons
+        quickBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const message = btn.getAttribute('data-message');
+                sendMessage(message);
+            });
+        });
+
+        // ===== INITIALIZE =====
+        getChatId();
+    </script>
+
+</body>
+</html>
